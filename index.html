@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Transmitter</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Inter font and general layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to the top */
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 90%;
+            width: 800px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 50px; /* Add some top margin for better spacing */
+        }
+        textarea, input[type="text"], select {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box; /* Ensure padding doesn't add to total width */
+        }
+        button {
+            background-color: #4f46e5;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        }
+        button:hover {
+            background-color: #4338ca;
+        }
+        .response-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 150px;
+            overflow-x: auto;
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-break: break-all; /* Break long words */
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container flex flex-col space-y-6">
+        <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-6">HTTP Transmitter</h1>
+
+        <!-- Request Section -->
+        <div class="space-y-4">
+            <div>
+                <label for="urlInput" class="block text-sm font-medium text-gray-700">URL:</label>
+                <input type="text" id="urlInput" placeholder="Enter URL (e.g., https://jsonplaceholder.typicode.com/posts)" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <div class="flex-1">
+                    <label for="methodSelect" class="block text-sm font-medium text-gray-700">Method:</label>
+                    <select id="methodSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label for="headersInput" class="block text-sm font-medium text-gray-700">Headers (JSON format):</label>
+                    <textarea id="headersInput" rows="3" placeholder='{"Content-Type": "application/json"}' class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
+                </div>
+            </div>
+
+            <div>
+                <label for="bodyInput" class="block text-sm font-medium text-gray-700">Request Body (for POST, JSON format):</label>
+                <textarea id="bodyInput" rows="5" placeholder='{"title": "foo", "body": "bar", "userId": 1}' class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
+            </div>
+
+            <button id="sendRequestBtn" class="w-full">Send Request</button>
+        </div>
+
+        <!-- Response Section -->
+        <div class="space-y-4 mt-8">
+            <h2 class="section-title">Response</h2>
+            <div>
+                <label for="responseStatus" class="block text-sm font-medium text-gray-700">Status:</label>
+                <div id="responseStatus" class="response-box text-gray-800"></div>
+            </div>
+            <div>
+                <label for="responseHeaders" class="block text-sm font-medium text-gray-700">Headers:</label>
+                <div id="responseHeaders" class="response-box text-gray-800"></div>
+            </div>
+            <div>
+                <label for="responseBody" class="block text-sm font-medium text-gray-700">Body:</label>
+                <div id="responseBody" class="response-box text-gray-800"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to HTML elements
+        const urlInput = document.getElementById('urlInput');
+        const methodSelect = document.getElementById('methodSelect');
+        const headersInput = document.getElementById('headersInput');
+        const bodyInput = document.getElementById('bodyInput');
+        const sendRequestBtn = document.getElementById('sendRequestBtn');
+        const responseStatus = document.getElementById('responseStatus');
+        const responseHeaders = document.getElementById('responseHeaders');
+        const responseBody = document.getElementById('responseBody');
+
+        // Event listener for the "Send Request" button
+        sendRequestBtn.addEventListener('click', sendRequest);
+
+        /**
+         * Sends an HTTP request based on user input.
+         */
+        async function sendRequest() {
+            const url = urlInput.value.trim();
+            const method = methodSelect.value;
+            let headers = {};
+            let body = null;
+
+            // Clear previous response
+            responseStatus.textContent = '';
+            responseHeaders.textContent = '';
+            responseBody.textContent = '';
+
+            // Basic URL validation
+            if (!url) {
+                displayError('Please enter a URL.');
+                return;
+            }
+
+            try {
+                // Parse headers JSON
+                if (headersInput.value.trim()) {
+                    headers = JSON.parse(headersInput.value);
+                }
+            } catch (e) {
+                displayError('Invalid Headers JSON. Please ensure it is valid JSON format.');
+                return;
+            }
+
+            // Prepare request options
+            const requestOptions = {
+                method: method,
+                headers: new Headers(headers), // Use Headers object for proper header handling
+            };
+
+            // Add body for POST requests
+            if (method === 'POST') {
+                try {
+                    if (bodyInput.value.trim()) {
+                        body = JSON.parse(bodyInput.value);
+                        requestOptions.body = JSON.stringify(body);
+                        // Default Content-Type to application/json if not explicitly set
+                        if (!requestOptions.headers.has('Content-Type')) {
+                            requestOptions.headers.set('Content-Type', 'application/json');
+                        }
+                    } else {
+                        // For POST, if body is empty, ensure Content-Type is not application/json
+                        if (requestOptions.headers.get('Content-Type') === 'application/json') {
+                             requestOptions.headers.delete('Content-Type'); // Or set to a more appropriate type if needed
+                        }
+                    }
+                } catch (e) {
+                    displayError('Invalid Request Body JSON. Please ensure it is valid JSON format.');
+                    return;
+                }
+            }
+
+            // Display loading indicator
+            sendRequestBtn.textContent = 'Sending...';
+            sendRequestBtn.disabled = true;
+
+            try {
+                // Make the fetch request
+                const response = await fetch(url, requestOptions);
+
+                // Display status
+                responseStatus.textContent = `${response.status} ${response.statusText}`;
+
+                // Display headers
+                let responseHeadersText = '';
+                for (const [key, value] of response.headers.entries()) {
+                    responseHeadersText += `${key}: ${value}\n`;
+                }
+                responseHeaders.textContent = responseHeadersText;
+
+                // Display body (try to parse as JSON, fallback to text)
+                try {
+                    const responseJson = await response.json();
+                    responseBody.textContent = JSON.stringify(responseJson, null, 2);
+                } catch (e) {
+                    // If parsing as JSON fails, treat as plain text
+                    const responseText = await response.text();
+                    responseBody.textContent = responseText;
+                }
+
+            } catch (error) {
+                displayError(`Request Failed: ${error.message}`);
+                console.error('Fetch error:', error);
+            } finally {
+                sendRequestBtn.textContent = 'Send Request';
+                sendRequestBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Displays an error message in the response status area.
+         * @param {string} message - The error message to display.
+         */
+        function displayError(message) {
+            responseStatus.textContent = `Error: ${message}`;
+            responseStatus.style.color = 'red';
+            responseHeaders.textContent = '';
+            responseBody.textContent = '';
+        }
+    </script>
+</body>
+</html>
